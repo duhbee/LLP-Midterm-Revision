@@ -127,6 +127,15 @@ input[type=range]{accent-color:var(--green2);width:220px}
 .explain.bad{border-color:var(--bad);background:var(--badbg)}
 .explain.good{border-color:var(--good);background:var(--goodbg)}
 .explain small{color:var(--muted)}
+.teach{margin-top:12px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--ink)}
+.teach h4{margin:0 0 6px;font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.teach h4+p{margin-top:0}.teach p{margin:0 0 10px;line-height:1.6}.teach p:last-child{margin-bottom:0}
+.warnt{display:block;margin-top:6px;color:var(--bad)}
+.terms{margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;color:var(--ink)}
+.terms summary{cursor:pointer;font-weight:600;font-size:.9rem}
+.terms dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:10px 0 4px;font-size:.92rem}
+.terms dt{font-weight:700;font-family:var(--mono);font-size:.85rem}.terms dd{margin:0}
+@media(max-width:600px){.terms dl{grid-template-columns:1fr}.terms dd{margin-bottom:6px}}
 .qnav{display:flex;justify-content:space-between;gap:10px;margin-top:18px;flex-wrap:wrap}
 .palette{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
 .palette button{width:34px;height:34px;border-radius:8px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:600 .75rem var(--mono)}

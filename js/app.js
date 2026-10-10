@@ -181,7 +181,7 @@
       else if (o === chosen) cls = 'sel';
       return `<button class="opt ${cls}" data-act="choose" data-v="${k}" ${locked ? 'disabled' : ''}><span class="k">${LET[k]}</span><span>${o}</span></button>`;
     }).join('')}</div>
-  ${locked ? `<div class="explain ${chosen === q.ans ? 'good' : 'bad'}"><b>${chosen === q.ans ? 'Correct.' : 'Not quite.'}</b> Answer: ${q.ans}. ${q.exp || ''} <br><small>Source: ${q.ref} · <a href="#/notes/${q.t}">Review notes</a></small></div>` : ''}
+  ${locked ? `<div class="explain ${chosen === q.ans ? 'good' : 'bad'}"><b>${chosen === q.ans ? 'Correct.' : 'Not quite.'}</b> Answer: ${q.ans}. ${q.exp || ''} <br><small>Source: ${q.ref} · <a href="#/notes/${q.t}">Review notes</a></small>${TEACH.panel(q, chosen)}</div>` : ''}
   <div class="qnav"><button class="btn ghost" data-act="prev" ${S.i ? '' : 'disabled'}>← Back</button>
    <span>${S.mode === 'study' && !locked ? '<button class="btn ghost" data-act="hint">Show where to look</button>' : ''}</span>
    ${S.i < S.ids.length - 1 ? '<button class="btn" data-act="next">Next →</button>' : `<button class="btn acc" data-act="finish">Finish (${answeredN}/${S.ids.length} answered)</button>`}</div>
@@ -218,7 +218,7 @@
   function reviewMCQ(id, chosen) {
     const q = MQ[id], ok = chosen === q.ans;
     return `<div class="rev ${ok ? 'ok' : 'no'}"><div class="qmeta"><span class="pill">${TOP[q.t].title}</span><span class="pill">${q.ref}</span></div>
-      <div>${q.text}</div><p><b>Your answer:</b> ${chosen == null ? '<i>blank</i>' : chosen}<br><b>Correct:</b> ${q.ans}</p>${q.exp ? `<small>${q.exp}</small>` : ''}</div>`;
+      <div>${q.text}</div><p><b>Your answer:</b> ${chosen == null ? '<i>blank</i>' : chosen}<br><b>Correct:</b> ${q.ans}</p>${q.exp ? `<small>${q.exp}</small>` : ''}${TEACH.panel(q, chosen)}</div>`;
   }
 
   function practiceResults() {

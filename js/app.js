@@ -25,6 +25,11 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const TOP = {}; TOPICS.forEach((t) => (TOP[t.id] = t));
   const MQ = {}; MCQ.forEach((q) => (MQ[q.id] = q));
+  const CODEQ = (window.CODE || []).map((x) => ({ id: x.id, t: x.t, set: x.set, kind: 'a', isCode: true, text: x.q, code: x.code,
+    ans: x.ans, accept: x.accept, steps: x.steps, ref: x.src, exp: '' }));
+  CODEQ.forEach((q) => (MQ[q.id] = q));
+  const ALLQ = MCQ.concat(CODEQ);
+  function isRight(id, a) { const q = MQ[id]; if (!q || a == null || a === '') return false; return q.isCode ? q.accept.some((v) => norm(v) === norm(a)) : a === q.ans; }
   const SQ = {}; SAQ.forEach((q) => (SQ[q.id] = q));
   const NONE = 'None of the options';
   const LET = 'ABCDEF';
@@ -69,7 +74,7 @@
   const savePrefs = () => store.set('prefs', prefs);
 
   function pool(topics, set, focus) {
-    return MCQ.filter((q) => topics.includes(q.t) && (set === 'all' || q.set === set) &&
+    return ALLQ.filter((q) => topics.includes(q.t) && (set === 'all' || q.set === set) &&
       (focus === 'mixed' || (focus === 'calc' ? q.kind === 'a' : q.kind === 'c')));
   }
   function balancedPick(list, n, r) { // round-robin across topics
@@ -87,7 +92,7 @@
     const parts = location.hash.replace(/^#\/?/, '').split('/');
     const r = parts[0] || 'home';
     document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('on', a.dataset.r === r || (r === 'practice' && a.dataset.r === 'home')));
-    const views = { home: viewHome, practice: viewPractice, notes: viewNotes, cards: viewCards, drills: viewDrills, mock: viewMock, sheet: viewSheet, progress: viewProgress };
+    const views = { home: viewHome, code: viewCode, practice: viewPractice, notes: viewNotes, cards: viewCards, drills: viewDrills, mock: viewMock, sheet: viewSheet, progress: viewProgress };
     (views[r] || viewHome)(parts[1]);
     window.scrollTo(0, 0);
   }
@@ -103,7 +108,7 @@
     $app.innerHTML = `
 <div class="eyebrow">Revision desk · Weeks 1–6</div>
 <h1>Low-level, high marks.</h1>
-<p class="lede">${MCQ.length} MCQs (${MCQ.filter((q) => q.set === 'past').length} from your past quizzes), ${SAQ.length} short-answer questions, notes, flashcards, no-calculator drills and a full 2-hour mock.</p>
+<p class="lede">${MCQ.length} MCQs and ${CODEQ.length} code-tracing questions (${ALLQ.filter((q) => q.set === 'past').length} from your past quizzes), ${SAQ.length} mock short-answer questions, notes, flashcards, no-calculator drills and a full 2-hour mock.</p>
 <div class="grid">
  <div>
   <section class="card">
@@ -117,7 +122,7 @@
   <section class="card">
    <div class="card-h"><h2>Pick topics</h2><span><button class="linkbtn" data-act="all">All</button> · <button class="linkbtn" data-act="none">Clear</button></span></div>
    <div class="topics">${TOPICS.map((t) => {
-      const c = MCQ.filter((q) => q.t === t.id).length, on = prefs.topics.includes(t.id);
+      const c = ALLQ.filter((q) => q.t === t.id).length, on = prefs.topics.includes(t.id);
       return `<label class="topic ${on ? 'sel' : ''}"><input type="checkbox" data-act="topic" data-v="${t.id}" ${on ? 'checked' : ''}><span class="n">${t.n}</span><span class="t"><b>${t.title}</b><small>${t.week} · ${t.sub}</small></span><span class="c">${c} Qs</span></label>`;
     }).join('')}</div>
   </section>
@@ -159,7 +164,7 @@
   function startSession(ids, mode) {
     const r = rng(Date.now() & 0xffffffff);
     S = { mode, ids, i: 0, ans: {}, order: {}, done: false, start: Date.now(), limit: mode === 'timed' ? ids.length * 90 : 0 };
-    ids.forEach((id) => (S.order[id] = optionOrder(MQ[id], r)));
+    ids.forEach((id) => { if (!MQ[id].isCode) S.order[id] = optionOrder(MQ[id], r); });
     saveS(); go('#/practice');
   }
 
@@ -175,13 +180,13 @@
  <div class="card qcard">
   <div class="qmeta"><span class="pill">${TOP[q.t].n} · ${TOP[q.t].title}</span><span class="pill">${q.set === 'past' ? 'Past quiz' : 'New'}</span><span class="pill">${q.kind === 'a' ? 'Calculation' : 'Concept'}</span></div>
   <div class="qtext">${q.text}</div>
-  <div class="opts">${opts.map((o, k) => {
+  ${q.isCode ? codeBody(q, chosen, locked) : `<div class="opts">${opts.map((o, k) => {
       let cls = '';
       if (locked) { if (o === q.ans) cls = 'ok'; else if (o === chosen) cls = 'no'; }
       else if (o === chosen) cls = 'sel';
       return `<button class="opt ${cls}" data-act="choose" data-v="${k}" ${locked ? 'disabled' : ''}><span class="k">${LET[k]}</span><span>${o}</span></button>`;
-    }).join('')}</div>
-  ${locked ? `<div class="explain ${chosen === q.ans ? 'good' : 'bad'}"><b>${chosen === q.ans ? 'Correct.' : 'Not quite.'}</b> Answer: ${q.ans}. ${q.exp || ''} <br><small>Source: ${q.ref} · <a href="#/notes/${q.t}">Review notes</a></small>${TEACH.panel(q, chosen)}</div>` : ''}
+    }).join('')}</div>`}
+  ${locked && !q.isCode ? `<div class="explain ${chosen === q.ans ? 'good' : 'bad'}"><b>${chosen === q.ans ? 'Correct.' : 'Not quite.'}</b> Answer: ${q.ans}. ${q.exp || ''} <br><small>Source: ${q.ref} · <a href="#/notes/${q.t}">Review notes</a></small>${TEACH.panel(q, chosen)}</div>` : ''}
   <div class="qnav"><button class="btn ghost" data-act="prev" ${S.i ? '' : 'disabled'}>← Back</button>
    <span>${S.mode === 'study' && !locked ? '<button class="btn ghost" data-act="hint">Show where to look</button>' : ''}</span>
    ${S.i < S.ids.length - 1 ? '<button class="btn" data-act="next">Next →</button>' : `<button class="btn acc" data-act="finish">Finish (${answeredN}/${S.ids.length} answered)</button>`}</div>
@@ -189,11 +194,19 @@
  </div>
  <div class="palette">${S.ids.map((x, k) => {
       let c = k === S.i ? 'cur ' : '';
-      if (S.ans[x] != null) c += S.mode === 'study' ? (S.ans[x] === MQ[x].ans ? 'ok' : 'no') : 'done';
+      if (S.ans[x] != null) c += S.mode === 'study' ? (isRight(x, S.ans[x]) ? 'ok' : 'no') : 'done';
       return `<button class="${c}" data-act="jump" data-v="${k}">${k + 1}</button>`;
     }).join('')}</div>
  <p class="foot">Keys: A–F or 1–6 choose · ← → move · Enter next</p></div>`;
     if (S.mode === 'timed') startTimer(S.start, S.limit, () => { S.done = true; finishPractice(); });
+  }
+
+  function codeBody(q, chosen, locked) {
+    const ok = isRight(q.id, chosen);
+    return `<pre class="code">${esc(q.code)}</pre>
+  <form class="row" data-act="prac-code"><input type="text" id="pcin" autocomplete="off" placeholder="Type your answer (uppercase hex, no 0x)" style="width:280px" value="${esc(chosen || '')}" ${locked ? 'disabled' : ''}>
+  ${S.mode === 'study' ? (locked ? '' : '<button class="btn sm">Check</button>') : '<span class="step">Saved as you type</span>'}</form>
+  ${locked ? `<div class="explain ${ok ? 'good' : 'bad'}"><b>${ok ? 'Correct.' : 'Not quite.'}</b> Answer: <code>${esc(q.ans)}</code><div class="teach"><h4>Step by step</h4>${q.steps}</div><small>Source: ${q.ref} · <a href="#/notes/${q.t}">Review notes</a></small></div>` : ''}`;
   }
 
   function startTimer(start, limit, onEnd) {
@@ -207,7 +220,7 @@
   }
 
   function finishPractice() {
-    if (!S.recorded) { S.ids.forEach((id) => { if (S.ans[id] != null) record(id, S.ans[id] === MQ[id].ans); }); S.recorded = true; }
+    if (!S.recorded) { S.ids.forEach((id) => { if (S.ans[id] != null) record(id, isRight(id, S.ans[id])); }); S.recorded = true; }
     S.done = true; saveS(); route();
   }
 
@@ -216,15 +229,17 @@
   }
 
   function reviewMCQ(id, chosen) {
-    const q = MQ[id], ok = chosen === q.ans;
+    const q = MQ[id], ok = isRight(id, chosen);
+    if (q.isCode) return `<div class="rev ${ok ? 'ok' : 'no'}"><div class="qmeta"><span class="pill">${TOP[q.t].title}</span><span class="pill">${q.ref}</span></div>
+      <div>${q.text}</div><pre class="code">${esc(q.code)}</pre><p><b>Your answer:</b> ${chosen ? '<code>' + esc(chosen) + '</code>' : '<i>blank</i>'}<br><b>Correct:</b> <code>${esc(q.ans)}</code></p><div class="teach"><h4>Step by step</h4>${q.steps}</div></div>`;
     return `<div class="rev ${ok ? 'ok' : 'no'}"><div class="qmeta"><span class="pill">${TOP[q.t].title}</span><span class="pill">${q.ref}</span></div>
       <div>${q.text}</div><p><b>Your answer:</b> ${chosen == null ? '<i>blank</i>' : chosen}<br><b>Correct:</b> ${q.ans}</p>${q.exp ? `<small>${q.exp}</small>` : ''}${TEACH.panel(q, chosen)}</div>`;
   }
 
   function practiceResults() {
-    const got = S.ids.filter((id) => S.ans[id] === MQ[id].ans).length;
-    const rows = {}; S.ids.forEach((id) => { const t = MQ[id].t; rows[t] = rows[t] || [0, 0]; rows[t][1]++; if (S.ans[id] === MQ[id].ans) rows[t][0]++; });
-    const wrong = S.ids.filter((id) => S.ans[id] !== MQ[id].ans);
+    const got = S.ids.filter((id) => isRight(id, S.ans[id])).length;
+    const rows = {}; S.ids.forEach((id) => { const t = MQ[id].t; rows[t] = rows[t] || [0, 0]; rows[t][1]++; if (isRight(id, S.ans[id])) rows[t][0]++; });
+    const wrong = S.ids.filter((id) => !isRight(id, S.ans[id]));
     const showAll = S.showAll;
     $app.innerHTML = `<div class="qwrap"><div class="eyebrow">${S.mode === 'timed' ? 'Timed set' : 'Study session'} · results</div>
  <div class="score">${got} / ${S.ids.length}</div><p class="lede">${pct(got, S.ids.length)}% · time ${fmt((Date.now() - S.start) / 1000)}</p>
@@ -232,6 +247,29 @@
  <div class="row noprint"><button class="btn" data-act="retrywrong" ${wrong.length ? '' : 'disabled'}>Retry ${wrong.length} wrong</button><button class="btn ghost" data-act="goto" data-v="#/">New session</button>
   <button class="btn ghost" data-act="toggleall">${showAll ? 'Show wrong only' : 'Show all answers'}</button></div>
  ${(showAll ? S.ids : wrong).map((id) => reviewMCQ(id, S.ans[id])).join('') || '<div class="empty">Nothing wrong. Nice.</div>'}</div>`;
+  }
+
+  /* ========== CODE TRACING ========== */
+  const CS = { filter: 'all', fb: {} };
+  const codeHist = store.get('codeHist', {});
+  function codeFeedback(x, ok, shown) {
+    return `<div class="explain ${shown ? '' : ok ? 'good' : 'bad'}">${shown ? '' : `<b>${ok ? 'Correct!' : 'Not quite.'}</b> `}Answer: <code>${esc(x.ans)}</code>
+      <div class="teach"><h4>Step by step</h4>${x.steps}</div><small>Source: ${x.src} · <a href="#/notes/${x.t}">Review notes</a></small></div>`;
+  }
+  function viewCode() {
+    const list = CODE.filter((x) => CS.filter === 'all' || x.set === CS.filter);
+    const done = CODE.filter((x) => codeHist[x.id]).length, right = CODE.filter((x) => codeHist[x.id] === 1).length;
+    $app.innerHTML = `<div class="eyebrow">Code tracing · short answer</div><h1>Read the code, predict the value.</h1>
+<p class="lede">Every “what is the value of r8 / what is the output / fill in the blank” question from your quizzes, plus new ones in the same style. Type your answer exactly as the exam asks (uppercase hex, no 0x, no spaces) and check it. Each one has a step-by-step solution.</p>
+<div class="row"><div class="seg">${[['all', 'All (' + CODE.length + ')'], ['past', 'From your quizzes (' + CODE.filter((x) => x.set === 'past').length + ')'], ['new', 'New practice (' + CODE.filter((x) => x.set === 'new').length + ')']].map(([v, l]) => `<button class="${CS.filter === v ? 'on' : ''}" data-act="code-filter" data-v="${v}">${l}</button>`).join('')}</div>
+<span class="step">${right}/${CODE.length} correct · ${done} attempted</span></div>
+${list.map((x, i) => `<section class="card qcard" id="${x.id}" style="max-width:860px">
+ <div class="qmeta"><span class="pill">Q${i + 1}</span><span class="pill">${x.set === 'past' ? x.src : 'New'}</span><span class="pill">${TOP[x.t].title}</span>${codeHist[x.id] === 1 ? '<span class="pill">✓ solved</span>' : ''}</div>
+ <div class="qtext">${x.q}</div>
+ <pre class="code">${esc(x.code)}</pre>
+ <form class="row" data-act="code-check" data-id="${x.id}"><input type="text" autocomplete="off" placeholder="Your answer" style="width:220px"><button class="btn sm">Check</button>
+ <button type="button" class="btn ghost sm" data-act="code-show" data-id="${x.id}">Show solution</button></form>
+ <div class="cfb">${CS.fb[x.id] || ''}</div></section>`).join('')}`;
   }
 
   /* ========== NOTES ========== */
@@ -464,11 +502,11 @@ ${mh.length ? `<div class="card"><h2>Mock history</h2>${mh.map((h) => `<p class=
         const n = prefs.count === 'all' ? p.length : Math.min(prefs.count, p.length);
         startSession(balancedPick(p, n).map((q) => q.id), prefs.mode); break;
       }
-      case 'practise-topic': startSession(balancedPick(MCQ.filter((q) => q.t === v), 15).map((q) => q.id), 'study'); break;
+      case 'practise-topic': startSession(balancedPick(ALLQ.filter((q) => q.t === v), 15).map((q) => q.id), 'study'); break;
       case 'choose': {
         const id = S.ids[S.i]; if (S.mode === 'study' && S.ans[id] != null) break;
         S.ans[id] = S.order[id][+v];
-        if (S.mode === 'study') record(id, S.ans[id] === MQ[id].ans);
+        if (S.mode === 'study') record(id, isRight(id, S.ans[id]));
         saveS(); route(); break;
       }
       case 'prev': if (S.i > 0) { S.i--; saveS(); route(); } break;
@@ -479,8 +517,14 @@ ${mh.length ? `<div class="card"><h2>Mock history</h2>${mh.map((h) => `<p class=
         if (S.mode === 'study') { S.recorded = true; } else if (Object.keys(S.ans).length < S.ids.length && !confirm('Some questions are unanswered. Finish anyway?')) break;
         finishPractice(); break;
       }
-      case 'retrywrong': startSession(S.ids.filter((id) => S.ans[id] !== MQ[id].ans), S.mode); break;
+      case 'retrywrong': startSession(S.ids.filter((id) => !isRight(id, S.ans[id])), S.mode); break;
       case 'toggleall': S.showAll = !S.showAll; saveS(); route(); break;
+      /* code */
+      case 'code-filter': CS.filter = v; route(); break;
+      case 'code-show': {
+        const x = CODE.find((c) => c.id === el.dataset.id); CS.fb[x.id] = codeFeedback(x, false, true);
+        el.closest('section').querySelector('.cfb').innerHTML = CS.fb[x.id]; break;
+      }
       /* cards */
       case 'fc-flip': FC.flip = !FC.flip; route(); break;
       case 'fc-next': if (FC.k < FC.deck.length - 1) { FC.k++; FC.flip = false; route(); } break;
@@ -527,9 +571,28 @@ ${mh.length ? `<div class="card"><h2>Mock history</h2>${mh.map((h) => `<p class=
     if (el.dataset.act === 'fc-hide') { FC.hide = el.checked; FC.deck = null; FC.k = 0; route(); }
   });
   $app.addEventListener('input', (e) => {
+    if (e.target.id === 'pcin' && S && S.mode === 'timed') { S.ans[S.ids[S.i]] = e.target.value; saveS(); return; }
     if (e.target.dataset.act === 'mock-type') { M.ans[M.saq[M.i - M.mcq.length]] = e.target.value; saveM(); }
   });
   $app.addEventListener('submit', (e) => {
+    if (e.target.dataset.act === 'prac-code') {
+      e.preventDefault();
+      const id = S.ids[S.i], v = document.getElementById('pcin').value.trim();
+      if (!v) return;
+      S.ans[id] = v;
+      if (S.mode === 'study') { record(id, isRight(id, v)); saveS(); route(); } else { saveS(); if (S.i < S.ids.length - 1) { S.i++; saveS(); route(); } }
+      return;
+    }
+    if (e.target.dataset.act === 'code-check') {
+      e.preventDefault();
+      const x = CODE.find((c) => c.id === e.target.dataset.id), raw = e.target.querySelector('input').value;
+      if (!raw.trim()) return;
+      const ok = x.accept.some((a) => norm(a) === norm(raw));
+      codeHist[x.id] = ok ? 1 : (codeHist[x.id] === 1 ? 1 : 0); store.set('codeHist', codeHist);
+      CS.fb[x.id] = codeFeedback(x, ok, false);
+      e.target.closest('section').querySelector('.cfb').innerHTML = CS.fb[x.id];
+      return;
+    }
     if (e.target.dataset.act !== 'dr-check') return;
     e.preventDefault();
     const raw = document.getElementById('drin').value.trim(); if (!raw) return;
